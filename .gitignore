@@ -1,0 +1,26 @@
+# Data (download once, never commit raw bars)
+data/raw/
+data/interim/
+data/processed/
+*.parquet
+*.npz
+*.csv
+
+# Results / MLflow
+results/
+mlruns/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+venv/
+.venv/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db

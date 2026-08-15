@@ -1,0 +1,56 @@
+# ── Data ──────────────────────────────────────────────────────────────────────
+data:
+  indices:
+    - symbol: SPX
+      exchange: NYSE        # tvDatafeed exchange string
+      tz: America/New_York
+      bars_per_day: 26      # 9:30-16:00, 15-min bars
+    - symbol: NIFTY
+      exchange: NSE
+      tz: Asia/Kolkata
+      bars_per_day: 25      # 9:15-15:30
+    - symbol: FTSE
+      exchange: LSE
+      tz: Europe/London
+      bars_per_day: 33      # 8:00-16:30
+
+  interval: 15m
+  n_bars: 6000              # target per index (matches base paper)
+  n_bars_min: 3000          # fallback per risk register
+
+  split:
+    train: 0.70
+    test: 0.30
+    # no validation split (matches base paper 70/30)
+
+  lag: 3                    # PACF analysis from paper (Fig. 1)
+
+  feature_sets:
+    univariate: [close]
+    multivariate: [close, ema5]
+
+# ── EMA ───────────────────────────────────────────────────────────────────────
+indicators:
+  ema5_period: 5            # β = 2/(5+1) = 0.333
+
+# ── Model ─────────────────────────────────────────────────────────────────────
+model:
+  hidden_size: 64           # not specified in paper; documented choice
+  num_layers: 2
+  dropout: 0.0
+  bidirectional: true
+
+training:
+  optimizer: adam
+  loss: mse
+  activation: relu
+  max_epochs: 50
+  batch_size: 32
+  learning_rate: 1.0e-3
+  incremental_lr: 1.0e-4   # smaller LR for per-bar updates
+  seeds: [42, 123, 7]
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+runtime:
+  device: auto              # "auto" → cuda if available else cpu
+  checkpoint_every_n_sessions: 5
