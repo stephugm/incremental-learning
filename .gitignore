@@ -4,11 +4,18 @@ data/interim/
 data/processed/
 *.parquet
 *.npz
-*.csv
 
-# Results / MLflow
-results/
+# Results — block large binary outputs, but allow CSV tables for thesis
+results/preds/
+results/checkpoints/
+results/figures/
 mlruns/
+
+# Allow thesis result tables (small CSV files)
+!results/*.csv
+
+# PDF papers (large, not code)
+*.pdf
 
 # Python
 __pycache__/
