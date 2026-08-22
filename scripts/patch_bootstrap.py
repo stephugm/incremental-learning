@@ -57,8 +57,13 @@ NEW_BOOTSTRAP = [
     "    sys.path.insert(0, str(REPO))\n",
     "\n",
     'print(f"Repo root: {REPO}")\n',
-    "%load_ext autoreload\n",
-    "%autoreload 2",
+    "# autoreload: best-effort, skip gracefully on Python 3.12+ if imp removed\n",
+    "try:\n",
+    "    _ip = get_ipython()  # noqa: F821\n",
+    "    _ip.run_line_magic('load_ext', 'autoreload')\n",
+    "    _ip.run_line_magic('autoreload', '2')\n",
+    "except Exception as _ar_e:\n",
+    "    print(f'autoreload skipped: {_ar_e}')",
 ]
 
 
@@ -87,6 +92,7 @@ def patch_notebook(path: Path) -> int:
 
 if __name__ == "__main__":
     targets = [
+        "01_data_exploration.ipynb",
         "02_data_pipeline.ipynb",
         "03_hblstm_reproduction.ipynb",
         "04_results_vs_paper.ipynb",

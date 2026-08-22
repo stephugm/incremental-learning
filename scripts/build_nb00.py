@@ -79,8 +79,13 @@ cells.append(code("c-bootstrap", [
     "    sys.path.insert(0, str(REPO))\n",
     "\n",
     'print(f"Repo root: {REPO}")\n',
-    "%load_ext autoreload\n",
-    "%autoreload 2",
+    "# autoreload: best-effort, skip gracefully on Python 3.12+ if imp removed\n",
+    "try:\n",
+    "    _ip = get_ipython()  # noqa: F821\n",
+    "    _ip.run_line_magic('load_ext', 'autoreload')\n",
+    "    _ip.run_line_magic('autoreload', '2')\n",
+    "except Exception as _ar_e:\n",
+    "    print(f'autoreload skipped: {_ar_e}')",
 ]))
 
 # 2. Imports & config
