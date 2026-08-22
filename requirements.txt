@@ -9,7 +9,11 @@ torch>=2.1
 torchinfo>=1.8
 
 # Data sources
-tvDatafeed>=2.3
+# tvDatafeed is NOT on PyPI — installed separately from GitHub by the notebook
+# bootstrap cell (best-effort). If unavailable, src/data.py auto-falls back to
+# yfinance (WARNING: yfinance only serves ~60 days of 15-min history, so the
+# n_bars=6000 target will NOT be met via yfinance alone).
+#   Manual install: pip install git+https://github.com/rongardF/tvdatafeed.git
 yfinance>=0.2.36
 
 # Technical indicators (incremental, used later for RQ2)
