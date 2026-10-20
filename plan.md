@@ -74,7 +74,7 @@ H.BLSTM is described as "partially incremental" — it requires a full batch ret
 ### 5.1 Data
 - **Indices:** SPX (USA), NIFTY (India), FTSE (UK) — one per region, selected to represent different volatility regimes and trading-session overlaps.
 - **Frequency:** 15-minute bars (OHLCV).
-- **Source:** tvDatafeed (TradingView) as in the base paper; fallback: yfinance (limited to 60 days per pull → rolling acquisition strategy).
+- **Source:** TradingView via tvkit (NB05, local download → parquet) as in the base paper; fallback: yfinance (limited to 60 days per pull → rolling acquisition strategy).
 - **Volume:** ≥ 6,000 bars per index (matching base paper), from at least two market regimes.
 - **Preprocessing:** train/validation/test split in strict chronological walk-forward order. **Scaler fit on train only, applied to val/test.** No shuffling.
 - **Regime annotation:** label each week as high-volatility or low-volatility using a 5-period rolling ATR percentile. Report metrics separately per regime.
@@ -223,7 +223,7 @@ No new features, no new experiments, no new models after week 8. If a new idea e
 
 | Risk | Probability | Impact | Mitigation |
 |---|---|---|---|
-| 15-min historical data unavailable for full period | Medium | High | Use rolling 60-day pulls from yfinance + tvDatafeed; or reduce to 3,000 bars instead of 6,000 |
+| 15-min historical data unavailable for full period | Medium | High | Use rolling 60-day pulls from yfinance + tvkit; or reduce to 3,000 bars instead of 6,000 |
 | Cannot reproduce base paper's exact MAPE | Medium | Low | Document discrepancy honestly; it is a finding, not a failure |
 | H.BLSTM training is very slow on CPU | Medium | Medium | Reduce model size (1 BiLSTM layer, smaller hidden dim); 3 indices × small model is CPU-feasible |
 | All three RQ experiments take longer than scheduled | Medium | High | Drop RQ3 if week 10 is already at risk; two-RQ thesis is fully valid |
@@ -236,7 +236,7 @@ No new features, no new experiments, no new models after week 8. If a new idea e
 
 | Purpose | Tool |
 |---|---|
-| Data download | `tvDatafeed`, `yfinance` |
+| Data download | `tvkit`, `yfinance` |
 | Data processing | `pandas`, `numpy` |
 | Incremental ML baselines | `river` (sklearn-river) |
 | Deep learning (H.BLSTM) | `PyTorch` or `TensorFlow/Keras` |

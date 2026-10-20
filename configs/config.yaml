@@ -2,7 +2,7 @@
 data:
   indices:
     - symbol: SPX
-      exchange: NYSE        # tvDatafeed exchange string
+      exchange: NYSE        # exchange hint for tvkit (confirm prefix via NB05 probe, e.g. SP:SPX)
       tz: America/New_York
       bars_per_day: 26      # 9:30-16:00, 15-min bars
     - symbol: NIFTY

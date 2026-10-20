@@ -5,7 +5,7 @@ Data pipeline for H.BLSTM reproduction.
 
 Stages
 ------
-1. download   – fetch 15-min bars via tvDatafeed (fallback: rolling yfinance)
+1. download   – fetch 15-min bars via cached parquet / tvkit (fallback: rolling yfinance)
 2. clean      – null/duplicate removal, chronological sort, tz-aware timestamps
 3. sessions   – tag each bar with session_id (local trading date) + bar index
 4. features   – causal incremental EMA5 (no look-ahead leakage)
@@ -32,23 +32,66 @@ import joblib
 # 1. Download
 # ──────────────────────────────────────────────────────────────────────────────
 
-def download_tvdatafeed(
+def _tvkit_fetch(exchange_symbol: str, n_bars: int) -> pd.DataFrame:
+    """Fetch bars with tvkit (async WebSocket). Local machine only."""
+    import asyncio
+    import concurrent.futures
+
+    from tvkit.api.chart.ohlcv import OHLCV  # type: ignore
+
+    async def _run():
+        async with OHLCV() as client:
+            return await client.get_historical_ohlcv(
+                exchange_symbol=exchange_symbol, interval="15", bars_count=n_bars
+            )
+
+    try:
+        asyncio.get_running_loop()
+        in_loop = True          # e.g. inside Jupyter
+    except RuntimeError:
+        in_loop = False
+
+    if in_loop:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            bars = pool.submit(lambda: asyncio.run(_run())).result()
+    else:
+        bars = asyncio.run(_run())
+
+    if not bars:
+        raise ValueError("tvkit returned empty result.")
+    rows = [{
+        "dt": pd.Timestamp(b.timestamp, unit="s", tz="UTC"),
+        "open": b.open, "high": b.high, "low": b.low,
+        "close": b.close, "volume": b.volume,
+    } for b in bars]
+    df = pd.DataFrame(rows).set_index("dt").sort_index()
+    df.index.name = None
+    return df[~df.index.duplicated(keep="first")]
+
+
+def download_tvkit(
     symbol: str,
     exchange: str,
     n_bars: int = 6000,
     save_path: Path | None = None,
     force: bool = False,
+    tv_symbol: str | None = None,
 ) -> pd.DataFrame:
     """
-    Fetch 15-min OHLCV bars via tvDatafeed.
+    Load 15-min OHLCV bars: cached parquet → tvkit → rolling yfinance.
+
+    Prefer producing the parquet with notebooks/05_download_tradingview.ipynb
+    (local machine, authenticated) and uploading it as a Kaggle dataset;
+    tvkit's WebSocket is blocked on Kaggle.
 
     Parameters
     ----------
-    symbol    : TradingView symbol, e.g. "SPX"
-    exchange  : TradingView exchange, e.g. "NYSE"
+    symbol    : index symbol, e.g. "SPX"
+    exchange  : TradingView exchange/prefix, e.g. "SP"
     n_bars    : number of historical bars to download
     save_path : if given, save raw parquet here
     force     : re-download even if save_path already exists
+    tv_symbol : full tvkit symbol "EXCHANGE:SYMBOL"; default f"{exchange}:{symbol}"
 
     Returns
     -------
@@ -60,22 +103,11 @@ def download_tvdatafeed(
         return pd.read_parquet(save_path)
 
     try:
-        from tvDatafeed import TvDatafeed, Interval  # type: ignore
-        tv = TvDatafeed()  # no credentials → public data
-        df = tv.get_hist(
-            symbol=symbol,
-            exchange=exchange,
-            interval=Interval.in_15_minute,
-            n_bars=n_bars,
-        )
-        if df is None or df.empty:
-            raise ValueError("tvDatafeed returned empty result.")
-        df.index = pd.to_datetime(df.index, utc=True)
-        df = df[["open", "high", "low", "close", "volume"]].copy()
-        print(f"[download] tvDatafeed OK: {symbol} — {len(df)} bars")
+        df = _tvkit_fetch(tv_symbol or f"{exchange}:{symbol}", n_bars)
+        print(f"[download] tvkit OK: {symbol} — {len(df)} bars")
     except Exception as exc:
         warnings.warn(
-            f"tvDatafeed failed ({exc}). Falling back to rolling yfinance.", stacklevel=2
+            f"tvkit failed ({exc}). Falling back to rolling yfinance.", stacklevel=2
         )
         df = _download_yfinance_rolling(symbol, n_bars)
 
@@ -101,8 +133,9 @@ def _download_yfinance_rolling(symbol: str, n_bars: int) -> pd.DataFrame:
     ticker = _TICKER_MAP.get(symbol, symbol)
 
     chunks: list[pd.DataFrame] = []
-    end = pd.Timestamp.utcnow()
-    while True:
+    end = pd.Timestamp.now(tz="UTC")          # fix: utcnow() deprecated in pandas 2.x
+    MAX_ITERATIONS = 20                        # guard: yfinance only has ~60 days anyway
+    for _ in range(MAX_ITERATIONS):
         start = end - pd.Timedelta(days=58)
         chunk = yf.download(
             ticker, start=start.date(), end=end.date(),
@@ -111,7 +144,11 @@ def _download_yfinance_rolling(symbol: str, n_bars: int) -> pd.DataFrame:
         if chunk.empty:
             break
         chunk.index = pd.to_datetime(chunk.index, utc=True)
-        chunk.columns = [c.lower() for c in chunk.columns]
+        # fix: yfinance ≥0.2.51 returns MultiIndex columns — flatten before .lower()
+        if isinstance(chunk.columns, pd.MultiIndex):
+            chunk.columns = [c[0].lower() for c in chunk.columns]
+        else:
+            chunk.columns = [str(c).lower() for c in chunk.columns]
         chunks.append(chunk[["open", "high", "low", "close", "volume"]])
         end = start
         total = sum(len(c) for c in chunks)
@@ -390,7 +427,7 @@ def build_dataset(
     features = ["close"] if feature_set == "univariate" else ["close", "ema5"]
 
     # 1. Download
-    df_raw = download_tvdatafeed(
+    df_raw = download_tvkit(
         symbol=symbol, exchange=exchange, n_bars=n_bars,
         save_path=paths.raw_parquet(symbol), force=force_download,
     )

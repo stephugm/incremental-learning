@@ -9,12 +9,17 @@ torch>=2.1
 # torchinfo>=1.8   # not imported anywhere in src/ — skip to avoid env pollution
 
 # Data sources
-# tvDatafeed is NOT on PyPI — installed separately from GitHub by the notebook
-# bootstrap cell (best-effort). If unavailable, src/data.py auto-falls back to
+# Primary source: TradingView via tvkit (see NB05, local only). Kaggle uses the
+# uploaded parquet dataset. If neither exists, src/data.py falls back to
 # yfinance (WARNING: yfinance only serves ~60 days of 15-min history, so the
 # n_bars=6000 target will NOT be met via yfinance alone).
-#   Manual install: pip install git+https://github.com/rongardF/tvdatafeed.git
 yfinance>=0.2.36
+# tvkit + browser-cookie3: LOCAL USE ONLY for NB05 download workflow.
+# Do NOT add to Kaggle requirements — tvkit uses WebSocket which Kaggle blocks,
+# and browser-cookie3 is meaningless in a headless Kaggle environment.
+# Install locally: pip install tvkit browser-cookie3
+# tvkit>=0.7.0
+# browser-cookie3
 
 # Technical indicators (incremental, used later for RQ2)
 # river>=0.21   # uncomment for RQ1 baselines
