@@ -87,8 +87,23 @@ class Paths:
             pass  # Already mounted or not on Colab
 
     # ------------------------------------------------------------------
+    def find_input_parquet(self, symbol: str) -> Path | None:
+        """Kaggle: search /kaggle/input recursively for {symbol}_15m.parquet."""
+        if self.env != "kaggle":
+            return None
+        root = getattr(self, "kaggle_input", Path("/kaggle/input"))
+        if not root.exists():
+            return None
+        for p in root.rglob(f"{symbol}_15m.parquet"):
+            return p
+        return None
+
     def raw_parquet(self, symbol: str) -> Path:
-        return self.raw / f"{symbol}_15m.parquet"
+        own = self.raw / f"{symbol}_15m.parquet"
+        if own.exists():
+            return own
+        found = self.find_input_parquet(symbol)
+        return found if found is not None else own
 
     def interim_parquet(self, symbol: str) -> Path:
         return self.interim / f"{symbol}_clean.parquet"
