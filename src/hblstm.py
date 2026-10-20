@@ -123,7 +123,9 @@ class HBLSTMRunner:
 
         input_size = X_train.shape[2]
         self.model = BiLSTMModel(input_size=input_size, **self.model_kwargs).to(self.device)
-        self.trainer = Trainer(device=self.device, verbose=self.verbose, **self.trainer_kwargs)
+        # trainer_kwargs may already contain "verbose"; let it override the runner default
+        trainer_args = {"device": self.device, "verbose": self.verbose, **self.trainer_kwargs}
+        self.trainer = Trainer(**trainer_args)
         self.updater = IncrementalUpdater(lr=self.incremental_lr, device=self.device)
 
         print(f"\n[runner] Phase 0 — initial batch training ({len(X_train)} samples) ...")
